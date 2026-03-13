@@ -408,10 +408,6 @@ gestureLayer.addEventListener('touchmove', (e) => {
   e.preventDefault();
 
   if (e.touches.length === 1) {
-    // Keep pinch tracking in sync so going back to 2 fingers is clean
-    lastTouch1X = e.touches[0].clientX;
-    lastTouch1Y = e.touches[0].clientY;
-
     const dx = e.touches[0].clientX - lastTouch1X;
     const dy = e.touches[0].clientY - lastTouch1Y;
 
