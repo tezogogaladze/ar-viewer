@@ -341,7 +341,9 @@ function onSessionEnd() {
   dot.visible         = false;
   gestureLayer.style.pointerEvents = 'none';
 
-  arBtn.style.display    = '';
+  arBtn.textContent   = 'View in AR';
+  arBtn.disabled      = false;
+  arBtn.style.display = '';
   hintEl.style.display   = 'none';
   arCtrls.style.display  = 'none';
 
