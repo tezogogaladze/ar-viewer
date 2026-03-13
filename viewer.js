@@ -404,9 +404,12 @@ gestureLayer.addEventListener('touchmove', (e) => {
     modelRoot.scale.setScalar(gestureScale);
     lastPinchDist = dist;
 
-    // Rotate (twist gesture)
+    // Rotate (twist gesture) — normalize delta to [-π, π] to prevent wrap-around jumps
     const angle = pinchAngle(e.touches);
-    gestureRotY += angle - lastPinchAngle;
+    let delta = angle - lastPinchAngle;
+    if (delta >  Math.PI) delta -= 2 * Math.PI;
+    if (delta < -Math.PI) delta += 2 * Math.PI;
+    gestureRotY += delta;
     modelRoot.rotation.y = gestureRotY;
     lastPinchAngle = angle;
   }
