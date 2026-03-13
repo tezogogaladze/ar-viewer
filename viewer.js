@@ -194,9 +194,10 @@ loader.load(
 );
 
 // ─── AR session state ─────────────────────────────────────────────────────────
-let xrSession       = null;
-let hitTestSource   = null;
-let modelPlaced     = false;
+let xrSession        = null;
+let hitTestSource    = null;
+let modelPlaced      = false;
+let useFixedPlacement = false; // fallback when hit-test is unavailable
 
 // ─── Gesture state ───────────────────────────────────────────────────────────
 let gestureRotY   = 0;
@@ -206,10 +207,16 @@ let lastPinchDist = 0;
 
 // ─── Start AR ─────────────────────────────────────────────────────────────────
 async function startAR() {
+  showError('');
+  arBtn.disabled = true;
+  arBtn.textContent = 'Starting…';
+
   try {
+    // hit-test is optional — if the device doesn't support it the session
+    // still starts and we fall back to fixed-distance tap-to-place.
     const session = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'light-estimation'],
+      requiredFeatures: [],
+      optionalFeatures: ['hit-test', 'dom-overlay', 'light-estimation'],
       domOverlay: { root: overlay },
     });
 
@@ -223,8 +230,7 @@ async function startAR() {
     hintEl.style.display  = 'block';
     arCtrls.style.display = 'flex';
 
-    // Start render loop immediately — camera feed is visible from this point.
-    // Hit test setup below is kept separate so a failure doesn't black out the screen.
+    // Start render loop immediately so camera feed appears right away.
     renderer.setAnimationLoop(renderFrame);
 
     // Set up hit testing (viewer space = ray from camera centre)
@@ -232,24 +238,48 @@ async function startAR() {
       const viewerSpace = await session.requestReferenceSpace('viewer');
       hitTestSource     = await session.requestHitTestSource({ space: viewerSpace });
     } catch (htErr) {
-      console.warn('[AR Viewer] Hit-test unavailable, tap-to-place disabled:', htErr);
-      hintEl.textContent = 'Surface detection unavailable on this device';
+      // Hit-test not supported — fall back to placing at a fixed 0.6 m distance
+      console.warn('[AR Viewer] Hit-test unavailable, using fixed-distance fallback:', htErr);
+      hintEl.textContent = 'Tap anywhere to place';
+      hitTestSource = null;
+      useFixedPlacement = true;
     }
 
   } catch (err) {
     console.error('[AR Viewer] Session start failed:', err);
-    arBtn.textContent = 'AR Failed — Retry';
-    arBtn.style.display = '';
+    arBtn.disabled = false;
+    arBtn.textContent = 'View in AR';
+    showError(`AR failed: ${err.message || err.name || err}`);
   }
+}
+
+// Shows a small error message below the AR button
+function showError(msg) {
+  let el = document.getElementById('ar-error');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'ar-error';
+    el.style.cssText = 'color:#ff6b6b;font-size:13px;text-align:center;margin-top:8px;padding:0 16px;line-height:1.4';
+    document.getElementById('controls').appendChild(el);
+  }
+  el.textContent = msg;
 }
 
 // ─── Tap → place ─────────────────────────────────────────────────────────────
 function onTap() {
-  if (!reticle.visible || !modelReady) return;
+  if (!modelReady) return;
+  if (!reticle.visible && !useFixedPlacement) return;
 
-  // Extract position from the reticle's world matrix
+  // Fixed-distance fallback: place 0.6 m in front of the camera
   const pos = new THREE.Vector3();
-  pos.setFromMatrixPosition(reticle.matrix);
+  if (useFixedPlacement) {
+    camera.getWorldPosition(pos);
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    pos.addScaledVector(dir, 0.6);
+  } else {
+    pos.setFromMatrixPosition(reticle.matrix);
+  }
 
   modelRoot.position.copy(pos);
   modelRoot.rotation.y = gestureRotY;
@@ -288,11 +318,12 @@ resetBtn.addEventListener('click', () => {
 
 // ─── Session end ─────────────────────────────────────────────────────────────
 function onSessionEnd() {
-  xrSession      = null;
-  hitTestSource  = null;
-  modelPlaced    = false;
-  gestureRotY    = 0;
-  gestureScale   = 1;
+  xrSession         = null;
+  hitTestSource     = null;
+  modelPlaced       = false;
+  useFixedPlacement = false;
+  gestureRotY       = 0;
+  gestureScale      = 1;
 
   modelRoot.visible   = false;
   shadowPlane.visible = false;
