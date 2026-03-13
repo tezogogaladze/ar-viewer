@@ -3,8 +3,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const MODEL_GLB  = '/models/model.glb';
-const MODEL_USDZ = '/models/model.usdz';
+// Models are served from jsDelivr CDN (GitHub repo → CDN) so Vercel builds
+// stay tiny. When you update a model, also purge the CDN cache:
+// https://purge.jsdelivr.net/gh/tezogogaladze/ar-viewer@main/public/models/model.glb
+const CDN = 'https://cdn.jsdelivr.net/gh/tezogogaladze/ar-viewer@main/public/models';
+const MODEL_GLB  = `${CDN}/model.glb`;
+const MODEL_USDZ = `${CDN}/model.usdz`;
 
 // Target size for the placed model (meters). Adjust per product.
 const TARGET_SIZE = 0.28;
