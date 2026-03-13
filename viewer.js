@@ -3,8 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const MODEL_GLB  = '/models/product.glb';
-const MODEL_USDZ = '/models/product.usdz';
+const MODEL_GLB  = '/models/model.glb';
+const MODEL_USDZ = '/models/model.usdz';
 
 // Target size for the placed model (meters). Adjust per product.
 const TARGET_SIZE = 0.28;
@@ -189,7 +189,7 @@ loader.load(
     loadingEl.innerHTML = `
       <p style="color:#ff6b6b;text-align:center;line-height:1.6;padding:0 24px">
         Could not load model.<br>
-        Drop a GLB into <code>models/product.glb</code><br>and refresh.
+        Drop a GLB into <code>public/models/model.glb</code><br>and refresh.
       </p>`;
   },
 );
