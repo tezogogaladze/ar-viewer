@@ -201,10 +201,18 @@ let modelPlaced      = false;
 let useFixedPlacement = false; // fallback when hit-test is unavailable
 
 // ─── Gesture state ───────────────────────────────────────────────────────────
-let gestureRotY   = 0;
-let gestureScale  = 1;
-let lastTouchX    = 0;
-let lastPinchDist = 0;
+let gestureRotY    = 0;
+let gestureScale   = 1;
+// 1-finger move
+let lastTouch1X    = 0;
+let lastTouch1Y    = 0;
+let moveStartX     = 0;
+let moveStartY     = 0;
+let moveStarted    = false;
+const MOVE_THRESHOLD = 8; // px — prevents accidental nudges
+// 2-finger rotate + scale
+let lastPinchDist  = 0;
+let lastPinchAngle = 0;
 
 // ─── Start AR ─────────────────────────────────────────────────────────────────
 async function startAR() {
@@ -309,9 +317,10 @@ function onTap() {
 
 // ─── Reset ────────────────────────────────────────────────────────────────────
 resetBtn.addEventListener('click', () => {
-  modelPlaced   = false;
-  gestureRotY   = 0;
-  gestureScale  = 1;
+  modelPlaced    = false;
+  gestureRotY    = 0;
+  gestureScale   = 1;
+  moveStarted    = false;
 
   modelRoot.visible  = false;
   modelRoot.rotation.set(0, 0, 0);
@@ -334,6 +343,7 @@ function onSessionEnd() {
   useFixedPlacement = false;
   gestureRotY       = 0;
   gestureScale      = 1;
+  moveStarted       = false;
 
   modelRoot.visible   = false;
   shadowPlane.visible = false;
@@ -350,15 +360,19 @@ function onSessionEnd() {
   renderer.setAnimationLoop(null);
 }
 
-// ─── Touch gestures (fired on #gesture-layer after model is placed) ───────────
-// The gesture layer sits above the canvas with pointer-events:auto only when
-// a model is placed, so the XR system still receives taps for initial placement.
+// ─── Touch gestures — matches iOS Quick Look behaviour ────────────────────────
+//   1 finger drag  → move model along floor plane
+//   2 finger twist → rotate (angle between fingers)
+//   2 finger pinch → scale (distance between fingers)
 gestureLayer.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (e.touches.length === 1) {
-    lastTouchX = e.touches[0].clientX;
+    moveStarted = false;
+    moveStartX  = lastTouch1X = e.touches[0].clientX;
+    moveStartY  = lastTouch1Y = e.touches[0].clientY;
   } else if (e.touches.length === 2) {
-    lastPinchDist = pinchDist(e.touches);
+    lastPinchDist  = pinchDist(e.touches);
+    lastPinchAngle = pinchAngle(e.touches);
   }
 }, { passive: false });
 
@@ -366,26 +380,70 @@ gestureLayer.addEventListener('touchmove', (e) => {
   e.preventDefault();
 
   if (e.touches.length === 1) {
-    // Single finger → rotate around Y axis
-    const dx = e.touches[0].clientX - lastTouchX;
-    gestureRotY += dx * 0.012;
-    modelRoot.rotation.y = gestureRotY;
-    lastTouchX = e.touches[0].clientX;
+    const dx = e.touches[0].clientX - lastTouch1X;
+    const dy = e.touches[0].clientY - lastTouch1Y;
+
+    // Only start moving after threshold to avoid accidental nudges
+    if (!moveStarted) {
+      const totalDx = e.touches[0].clientX - moveStartX;
+      const totalDy = e.touches[0].clientY - moveStartY;
+      if (Math.sqrt(totalDx * totalDx + totalDy * totalDy) > MOVE_THRESHOLD) {
+        moveStarted = true;
+      }
+    }
+
+    if (moveStarted) moveModelByDelta(dx, dy);
+
+    lastTouch1X = e.touches[0].clientX;
+    lastTouch1Y = e.touches[0].clientY;
 
   } else if (e.touches.length === 2) {
-    // Two fingers → pinch to scale
-    const dist  = pinchDist(e.touches);
-    const ratio = dist / lastPinchDist;
-    gestureScale = Math.min(5.0, Math.max(0.05, gestureScale * ratio));
+    // Scale
+    const dist = pinchDist(e.touches);
+    gestureScale = Math.min(5.0, Math.max(0.05, gestureScale * (dist / lastPinchDist)));
     modelRoot.scale.setScalar(gestureScale);
     lastPinchDist = dist;
+
+    // Rotate (twist gesture)
+    const angle = pinchAngle(e.touches);
+    gestureRotY += angle - lastPinchAngle;
+    modelRoot.rotation.y = gestureRotY;
+    lastPinchAngle = angle;
   }
 }, { passive: false });
+
+// Project screen-space drag onto the horizontal floor plane
+function moveModelByDelta(dx, dy) {
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  fwd.y = 0;
+  fwd.normalize();
+
+  const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0)).normalize();
+
+  // Scale movement by distance to model so far objects don't fly away
+  const dist = camera.position.distanceTo(modelRoot.position);
+  const f = Math.max(0.0005, dist * 0.0015);
+
+  modelRoot.position.addScaledVector(right, dx * f);
+  modelRoot.position.addScaledVector(fwd, -dy * f);
+
+  // Keep shadow plane in sync
+  shadowPlane.position.x = modelRoot.position.x;
+  shadowPlane.position.z = modelRoot.position.z;
+}
 
 function pinchDist(touches) {
   const dx = touches[0].clientX - touches[1].clientX;
   const dy = touches[0].clientY - touches[1].clientY;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+function pinchAngle(touches) {
+  return Math.atan2(
+    touches[1].clientY - touches[0].clientY,
+    touches[1].clientX - touches[0].clientX,
+  );
 }
 
 // ─── Render loop ─────────────────────────────────────────────────────────────
