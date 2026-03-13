@@ -20,6 +20,11 @@
       <p>Loading model…</p>
     </div>
 
+    <!-- Transparent layer that captures touch gestures after model placement.
+         pointer-events: none before placement (XR gets taps → select event),
+         pointer-events: auto after placement (DOM gets touches → rotate/scale). -->
+    <div id="gesture-layer"></div>
+
     <!-- DOM overlay (shown inside the AR session on Android) -->
     <div id="overlay">
       <div id="header">AR Product Viewer</div>

@@ -15,14 +15,15 @@ const isIOS =
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // ─── DOM ──────────────────────────────────────────────────────────────────────
-const canvas     = document.getElementById('canvas');
-const loadingEl  = document.getElementById('loading');
-const overlay    = document.getElementById('overlay');
-const arBtn      = document.getElementById('ar-button');
-const iosBtn     = document.getElementById('ios-button');
-const resetBtn   = document.getElementById('reset-button');
-const arCtrls    = document.getElementById('ar-controls');
-const hintEl     = document.getElementById('hint');
+const canvas        = document.getElementById('canvas');
+const gestureLayer  = document.getElementById('gesture-layer');
+const loadingEl     = document.getElementById('loading');
+const overlay       = document.getElementById('overlay');
+const arBtn         = document.getElementById('ar-button');
+const iosBtn        = document.getElementById('ios-button');
+const resetBtn      = document.getElementById('reset-button');
+const arCtrls       = document.getElementById('ar-controls');
+const hintEl        = document.getElementById('hint');
 
 // ─── Platform routing ─────────────────────────────────────────────────────────
 if (isIOS) {
@@ -301,6 +302,9 @@ function onTap() {
   dot.visible      = false;
   hintEl.style.display = 'none';
   modelPlaced = true;
+
+  // Hand touch events to the gesture layer so rotate/pinch work
+  gestureLayer.style.pointerEvents = 'auto';
 }
 
 // ─── Reset ────────────────────────────────────────────────────────────────────
@@ -314,8 +318,11 @@ resetBtn.addEventListener('click', () => {
   modelRoot.scale.setScalar(1);
 
   shadowPlane.visible = false;
-  reticle.visible     = false; // will re-appear on next hit-test result
+  reticle.visible     = false;
   dot.visible         = false;
+
+  // Return touches to XR system so tap-to-place works again
+  gestureLayer.style.pointerEvents = 'none';
   hintEl.style.display = 'block';
 });
 
@@ -332,6 +339,7 @@ function onSessionEnd() {
   shadowPlane.visible = false;
   reticle.visible     = false;
   dot.visible         = false;
+  gestureLayer.style.pointerEvents = 'none';
 
   arBtn.style.display    = '';
   hintEl.style.display   = 'none';
@@ -340,9 +348,10 @@ function onSessionEnd() {
   renderer.setAnimationLoop(null);
 }
 
-// ─── Touch gestures (fired on #canvas while in AR) ────────────────────────────
-canvas.addEventListener('touchstart', (e) => {
-  if (!modelPlaced) return;
+// ─── Touch gestures (fired on #gesture-layer after model is placed) ───────────
+// The gesture layer sits above the canvas with pointer-events:auto only when
+// a model is placed, so the XR system still receives taps for initial placement.
+gestureLayer.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (e.touches.length === 1) {
     lastTouchX = e.touches[0].clientX;
@@ -351,8 +360,7 @@ canvas.addEventListener('touchstart', (e) => {
   }
 }, { passive: false });
 
-canvas.addEventListener('touchmove', (e) => {
-  if (!modelPlaced) return;
+gestureLayer.addEventListener('touchmove', (e) => {
   e.preventDefault();
 
   if (e.touches.length === 1) {
