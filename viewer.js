@@ -220,6 +220,9 @@ async function startAR() {
       domOverlay: { root: overlay },
     });
 
+    // 'local-floor' (Three.js default) is rejected on many Android AR sessions.
+    // 'local' is universally supported for immersive-ar.
+    renderer.xr.setReferenceSpaceType('local');
     await renderer.xr.setSession(session);
     xrSession = session;
 
