@@ -53,12 +53,15 @@ async function initWebXRButton() {
 // ─── Renderer ─────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({
   canvas,
-  alpha: true,          // transparent background (camera feed shows through)
+  alpha: true,
   antialias: true,
-  powerPreference: 'high-performance',
+  // 'high-performance' breaks WebXR on several Android GPUs — leave as default
 });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+// CRITICAL: default clear alpha is 1 (opaque), which blacks out the camera feed.
+// Set to 0 so the XR camera feed shows through the transparent canvas.
+renderer.setClearColor(0x000000, 0);
 renderer.xr.enabled = true;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -213,10 +216,6 @@ async function startAR() {
     await renderer.xr.setSession(session);
     xrSession = session;
 
-    // Viewer space is the origin for hit-testing (ray from camera center)
-    const viewerSpace  = await session.requestReferenceSpace('viewer');
-    hitTestSource      = await session.requestHitTestSource({ space: viewerSpace });
-
     session.addEventListener('select', onTap);
     session.addEventListener('end', onSessionEnd);
 
@@ -224,9 +223,23 @@ async function startAR() {
     hintEl.style.display  = 'block';
     arCtrls.style.display = 'flex';
 
+    // Start render loop immediately — camera feed is visible from this point.
+    // Hit test setup below is kept separate so a failure doesn't black out the screen.
     renderer.setAnimationLoop(renderFrame);
+
+    // Set up hit testing (viewer space = ray from camera centre)
+    try {
+      const viewerSpace = await session.requestReferenceSpace('viewer');
+      hitTestSource     = await session.requestHitTestSource({ space: viewerSpace });
+    } catch (htErr) {
+      console.warn('[AR Viewer] Hit-test unavailable, tap-to-place disabled:', htErr);
+      hintEl.textContent = 'Surface detection unavailable on this device';
+    }
+
   } catch (err) {
     console.error('[AR Viewer] Session start failed:', err);
+    arBtn.textContent = 'AR Failed — Retry';
+    arBtn.style.display = '';
   }
 }
 
