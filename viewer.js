@@ -210,9 +210,12 @@ let moveStartX     = 0;
 let moveStartY     = 0;
 let moveStarted    = false;
 const MOVE_THRESHOLD = 8; // px — prevents accidental nudges
-// 2-finger rotate + scale
+// 2-finger rotate + scale — tracked by touch identifier, not array index
+let pinchId0 = -1; // identifier of the first  tracked finger
+let pinchId1 = -1; // identifier of the second tracked finger
 let lastPinchDist  = 0;
 let lastPinchAngle = 0;
+let pinchFrameSkip = false; // discard first move frame after finger-count change
 
 // ─── Start AR ─────────────────────────────────────────────────────────────────
 async function startAR() {
@@ -321,6 +324,7 @@ resetBtn.addEventListener('click', () => {
   gestureRotY    = 0;
   gestureScale   = 1;
   moveStarted    = false;
+  pinchId0 = pinchId1 = -1;
 
   modelRoot.visible  = false;
   modelRoot.rotation.set(0, 0, 0);
@@ -344,6 +348,7 @@ function onSessionEnd() {
   gestureRotY       = 0;
   gestureScale      = 1;
   moveStarted       = false;
+  pinchId0 = pinchId1 = -1;
 
   modelRoot.visible   = false;
   shadowPlane.visible = false;
@@ -362,17 +367,40 @@ function onSessionEnd() {
 
 // ─── Touch gestures — matches iOS Quick Look behaviour ────────────────────────
 //   1 finger drag  → move model along floor plane
-//   2 finger twist → rotate (angle between fingers)
-//   2 finger pinch → scale (distance between fingers)
+//   2 finger twist → rotate   (angle between fingers)
+//   2 finger pinch → scale    (distance between fingers)
+//
+// Touches are tracked by identifier (not array index) so reordering by the
+// browser never causes a phantom rotation or scale jump.
+
+function getTouchById(list, id) {
+  for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
+  return null;
+}
+
 gestureLayer.addEventListener('touchstart', (e) => {
   e.preventDefault();
+
   if (e.touches.length === 1) {
+    // Reset single-finger tracking
     moveStarted = false;
     moveStartX  = lastTouch1X = e.touches[0].clientX;
     moveStartY  = lastTouch1Y = e.touches[0].clientY;
+    // Clear pinch ids so a later 2nd finger gets fresh ids
+    pinchId0 = pinchId1 = -1;
+
   } else if (e.touches.length === 2) {
-    lastPinchDist  = pinchDist(e.touches);
-    lastPinchAngle = pinchAngle(e.touches);
+    // Lock in which two identifiers we track for this pinch gesture
+    pinchId0 = e.touches[0].identifier;
+    pinchId1 = e.touches[1].identifier;
+    lastPinchDist  = pinchDistById(e.touches, pinchId0, pinchId1);
+    lastPinchAngle = pinchAngleById(e.touches, pinchId0, pinchId1);
+    pinchFrameSkip = true; // discard next move frame — fingers haven't settled yet
+
+    // Keep 1-finger tracking in sync so releasing one finger doesn't snap
+    lastTouch1X = e.touches[0].clientX;
+    lastTouch1Y = e.touches[0].clientY;
+    moveStarted = false;
   }
 }, { passive: false });
 
@@ -380,10 +408,13 @@ gestureLayer.addEventListener('touchmove', (e) => {
   e.preventDefault();
 
   if (e.touches.length === 1) {
+    // Keep pinch tracking in sync so going back to 2 fingers is clean
+    lastTouch1X = e.touches[0].clientX;
+    lastTouch1Y = e.touches[0].clientY;
+
     const dx = e.touches[0].clientX - lastTouch1X;
     const dy = e.touches[0].clientY - lastTouch1Y;
 
-    // Only start moving after threshold to avoid accidental nudges
     if (!moveStarted) {
       const totalDx = e.touches[0].clientX - moveStartX;
       const totalDy = e.touches[0].clientY - moveStartY;
@@ -397,19 +428,29 @@ gestureLayer.addEventListener('touchmove', (e) => {
     lastTouch1X = e.touches[0].clientX;
     lastTouch1Y = e.touches[0].clientY;
 
-  } else if (e.touches.length === 2) {
-    // Scale
-    const dist = pinchDist(e.touches);
-    gestureScale = Math.min(5.0, Math.max(0.05, gestureScale * (dist / lastPinchDist)));
-    modelRoot.scale.setScalar(gestureScale);
-    lastPinchDist = dist;
+  } else if (e.touches.length >= 2) {
+    // Keep 1-finger tracking in sync → prevents snap when second finger lifts
+    const t0 = getTouchById(e.touches, pinchId0);
+    if (t0) { lastTouch1X = t0.clientX; lastTouch1Y = t0.clientY; }
+    moveStarted = false;
 
-    // Rotate (twist gesture) — normalize delta to [-π, π] to prevent wrap-around jumps
-    const angle = pinchAngle(e.touches);
+    // Skip the first move frame after a finger-count change to avoid first-frame jitter
+    if (pinchFrameSkip) { pinchFrameSkip = false; return; }
+
+    // Scale
+    const dist = pinchDistById(e.touches, pinchId0, pinchId1);
+    if (dist > 0) {
+      gestureScale = Math.min(5.0, Math.max(0.05, gestureScale * (dist / lastPinchDist)));
+      modelRoot.scale.setScalar(gestureScale);
+      lastPinchDist = dist;
+    }
+
+    // Rotate — negate delta so clockwise twist = clockwise model spin from user's POV
+    const angle = pinchAngleById(e.touches, pinchId0, pinchId1);
     let delta = angle - lastPinchAngle;
-    if (delta >  Math.PI) delta -= 2 * Math.PI;
+    if (delta >  Math.PI) delta -= 2 * Math.PI; // prevent atan2 wrap-around jumps
     if (delta < -Math.PI) delta += 2 * Math.PI;
-    gestureRotY += delta;
+    gestureRotY -= delta; // fix #3: negative = matches user's visual expectation
     modelRoot.rotation.y = gestureRotY;
     lastPinchAngle = angle;
   }
@@ -436,17 +477,18 @@ function moveModelByDelta(dx, dy) {
   shadowPlane.position.z = modelRoot.position.z;
 }
 
-function pinchDist(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
+function pinchDistById(list, id0, id1) {
+  const a = getTouchById(list, id0);
+  const b = getTouchById(list, id1);
+  if (!a || !b) return 0;
+  return Math.sqrt((a.clientX - b.clientX) ** 2 + (a.clientY - b.clientY) ** 2);
 }
 
-function pinchAngle(touches) {
-  return Math.atan2(
-    touches[1].clientY - touches[0].clientY,
-    touches[1].clientX - touches[0].clientX,
-  );
+function pinchAngleById(list, id0, id1) {
+  const a = getTouchById(list, id0);
+  const b = getTouchById(list, id1);
+  if (!a || !b) return lastPinchAngle; // return unchanged if a finger is missing
+  return Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX);
 }
 
 // ─── Render loop ─────────────────────────────────────────────────────────────
