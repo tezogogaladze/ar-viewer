@@ -12,6 +12,15 @@
           "value": "same-origin"
         }
       ]
+    },
+    {
+      "source": "/models/(.*).usdz",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "model/vnd.usdz+zip"
+        }
+      ]
     }
   ]
 }
