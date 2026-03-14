@@ -8,9 +8,6 @@
     "build": "vite build",
     "preview": "vite preview --host --https"
   },
-  "dependencies": {
-    "three": "^0.170.0"
-  },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "vite": "^6.0.0"

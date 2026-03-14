@@ -5,73 +5,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#0a0a0a" />
     <title>AR Product Viewer</title>
     <link rel="stylesheet" href="viewer.css" />
+    <script
+      type="module"
+      src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"
+    ></script>
   </head>
   <body>
 
-    <!-- Three.js renders here -->
-    <canvas id="canvas"></canvas>
+    <model-viewer
+      id="viewer"
+      src="/models/model.glb"
+      ios-src="/models/model.usdz"
+      ar
+      ar-modes="scene-viewer webxr quick-look"
+      ar-scale="auto"
+      camera-controls
+      touch-action="pan-y"
+      shadow-intensity="1"
+      shadow-softness="0.9"
+      exposure="1"
+      environment-image="neutral"
+      loading="eager"
+      reveal="auto"
+      auto-rotate
+      auto-rotate-delay="3000"
+      rotation-per-second="20deg"
+    >
 
-    <!-- Loading screen -->
+      <!-- Custom AR button — model-viewer shows this only when AR is available -->
+      <button slot="ar-button" id="ar-button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 3H3v4M19 3h2v4M5 21H3v-4M19 21h2v-4"/>
+          <rect x="7" y="7" width="10" height="10" rx="1"/>
+        </svg>
+        View in AR
+      </button>
+
+    </model-viewer>
+
+    <!-- Loading screen — hidden once model fires 'load' event -->
     <div id="loading">
       <div class="spinner"></div>
       <p>Loading model…</p>
-    </div>
-
-    <!-- DOM overlay (shown inside the AR session on Android) -->
-    <div id="overlay">
-
-      <!-- Gesture capture layer — must be INSIDE the overlay root so WebXR
-           dom-overlay sees it. pointer-events:none → XR gets taps (placement).
-           pointer-events:auto → DOM gets touches (rotate / pinch-scale). -->
-      <div id="gesture-layer"></div>
-
-      <div id="header">AR Product Viewer</div>
-
-      <!-- Scanning hint shown before placement -->
-      <div id="hint">Move your phone slowly to detect a surface</div>
-
-      <!-- Bottom controls -->
-      <div id="controls">
-
-        <!-- Android / WebXR path -->
-        <button id="ar-button" class="btn btn-primary">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 3H3v4M19 3h2v4M5 21H3v-4M19 21h2v-4"/>
-            <rect x="7" y="7" width="10" height="10" rx="1"/>
-          </svg>
-          View in AR
-        </button>
-
-        <!--
-          iOS Quick Look path.
-          AR Quick Look requires an <a rel="ar"> with an <img> child.
-          The img is hidden; the visible content is the button label below it.
-        -->
-        <a id="ios-button" class="btn btn-primary" rel="ar" href="/models/model.usdz">
-          <img src="" alt="" aria-hidden="true" style="display:none" />
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 3H3v4M19 3h2v4M5 21H3v-4M19 21h2v-4"/>
-            <rect x="7" y="7" width="10" height="10" rx="1"/>
-          </svg>
-          View in Your Space
-        </a>
-
-      </div>
-
-      <!-- In-session controls (reset) -->
-      <div id="ar-controls">
-        <button id="reset-button" class="btn btn-ghost">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-          </svg>
-          Reset
-        </button>
-        <div id="gesture-hint">Drag to move · Twist to rotate · Pinch to scale</div>
-      </div>
     </div>
 
     <script type="module" src="viewer.js"></script>

@@ -1,4 +1,4 @@
-/* ─── Reset & Base ─────────────────────────────────────────────────────────── */
+/* ─── Reset ────────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -11,36 +11,76 @@ html, body {
   background: #0a0a0a;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
-  color: #fff;
 }
 
-/* ─── Canvas ───────────────────────────────────────────────────────────────── */
-#canvas {
-  position: fixed;
-  inset: 0;
+/* ─── Model Viewer ─────────────────────────────────────────────────────────── */
+model-viewer {
   width: 100%;
-  height: 100%;
+  height: 100svh;
   display: block;
-  touch-action: none; /* prevent browser scroll during gestures */
+
+  /* CSS custom properties exposed by model-viewer */
+  --poster-color: #0a0a0a;
+  --progress-bar-color: rgba(255, 255, 255, 0.4);
+  --progress-bar-height: 2px;
 }
+
+/* ─── AR Button (slot="ar-button") ────────────────────────────────────────── */
+#ar-button {
+  /* Position at bottom-centre of the model-viewer */
+  position: absolute;
+  bottom: max(env(safe-area-inset-bottom), 40px);
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 36px;
+
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+#ar-button:active {
+  transform: translateX(-50%) scale(0.96);
+  opacity: 0.88;
+}
+
+/* model-viewer hides the ar-button slot when AR is unavailable — no extra work needed */
 
 /* ─── Loading Screen ───────────────────────────────────────────────────────── */
 #loading {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 18px;
   background: #0a0a0a;
+  color: #fff;
+  pointer-events: none;
 }
 
 #loading p {
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.5);
   letter-spacing: 0.02em;
 }
 
@@ -55,178 +95,4 @@ html, body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* ─── Gesture capture layer ───────────────────────────────────────────────── */
-/* Lives inside #overlay so WebXR dom-overlay recognises it.
-   z-index:0 keeps it behind header/controls/hint (which need their own taps). */
-#gesture-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  touch-action: none;
-}
-
-/* ─── DOM Overlay ──────────────────────────────────────────────────────────── */
-#overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  pointer-events: none;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  /* safe area insets for notched phones */
-  padding: max(env(safe-area-inset-top), 20px) 24px max(env(safe-area-inset-bottom), 40px);
-}
-
-/* ─── Header ───────────────────────────────────────────────────────────────── */
-#header {
-  position: relative;
-  z-index: 10;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-  margin-top: 8px;
-}
-
-/* ─── Scanning Hint ────────────────────────────────────────────────────────── */
-#hint {
-  position: relative;
-  z-index: 10;
-  display: none;
-  margin-top: auto;
-  margin-bottom: 20px;
-  padding: 10px 22px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 100px;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  text-align: center;
-  pointer-events: none;
-  animation: fadeUp 0.4s ease;
-}
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ─── Bottom Controls (pre-session) ───────────────────────────────────────── */
-#controls {
-  position: relative;
-  z-index: 10;
-  pointer-events: all;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  max-width: 340px;
-  margin-top: auto;
-  animation: fadeUp 0.5s ease;
-}
-
-/* ─── In-session Controls ──────────────────────────────────────────────────── */
-#ar-controls {
-  display: none;
-  position: relative;
-  z-index: 10;
-  pointer-events: all;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-top: auto;
-  animation: fadeUp 0.3s ease;
-}
-
-#gesture-hint {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.02em;
-  pointer-events: none;
-}
-
-/* ─── Buttons ──────────────────────────────────────────────────────────────── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 16px 28px;
-  border: none;
-  border-radius: 100px;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
-  white-space: nowrap;
-  user-select: none;
-}
-
-.btn:active {
-  transform: scale(0.96);
-  opacity: 0.88;
-}
-
-.btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-/* Primary — white pill */
-.btn-primary {
-  background: #ffffff;
-  color: #000000;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255,255,255,0.08) inset;
-}
-
-.btn-primary:hover {
-  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.5);
-}
-
-/* Ghost — frosted dark pill */
-.btn-ghost {
-  width: auto;
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  font-size: 14px;
-}
-
-/* iOS Quick Look anchor — hidden by default */
-#ios-button {
-  display: none;
-}
-
-/* ─── Reticle pulse animation (applied via JS class) ──────────────────────── */
-@keyframes reticle-pulse {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50%       { opacity: 0.5;  transform: scale(0.9); }
-}
-
-/* ─── Responsive tweaks ────────────────────────────────────────────────────── */
-@media (max-height: 700px) {
-  #header { display: none; }
-  .btn { padding: 14px 24px; font-size: 15px; }
 }
