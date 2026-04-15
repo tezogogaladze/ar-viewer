@@ -53,7 +53,7 @@ Designed for e-commerce and product demos, it allows seamless transition from 3D
 ## Getting Started
 
 ```bash
-git clone https://github.com/your-username/ar-viewer.git
+git clone https://github.com/tezogogaladze/ar-viewer.git
 cd ar-viewer
 npm install
 npm run dev
